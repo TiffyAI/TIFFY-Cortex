@@ -34,7 +34,7 @@
             max-width: 400px;
             border-radius: 12px;
             text-align: center;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1-200.06);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
         .close-button {
             color: #aaa;
@@ -130,17 +130,17 @@
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, serverTimestamp, onSnapshot, query, orderBy, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-analytics.js";
-        
-        // This is your Firebase project configuration. You must paste your keys here.
+
+        // This is your Firebase project configuration. You must paste all seven keys here.
         const firebaseConfig = {
-          apiKey: "AIzaSyD7ajxFTiETsJMg3nXC2i3-xMid70DEhjI",
-          authDomain: "tiffyai.firebaseapp.com",
-          projectId: "tiffyai",
-          storageBucket: "tiffyai.firebasestorage.app",
-          messagingSenderId: "1047156912441",
-          appId: "1:1047156912441:web:4e0979c965a5b4e63578e8",
-          measurementId: "G-TYC2YVJ49W"
-        };
+    apiKey: "AIzaSyD7ajxFTiETsJMg3nXC2i3-xMid70DEhjI",
+    authDomain: "tiffyai.firebaseapp.com",
+    projectId: "tiffyai",
+    storageBucket: "tiffyai.firebasestorage.app",
+    messagingSenderId: "1047156912441",
+    appId: "1:1047156912441:web:4e0979c965a5b4e63578e8",
+    measurementId: "G-TYC2YVJ49W"
+  };
         
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : localFirebaseConfig;
         
