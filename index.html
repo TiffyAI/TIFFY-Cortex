@@ -3,70 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chat with Tokens</title>
+  <title>TiffyAI Token Chat</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body {
-      font-family: 'Inter', sans-serif;
-      background-color: #f3f4f6;
-      color: #1f2937;
-    }
-    .modal {
-      display: none;
-      position: fixed;
-      z-index: 1000;
-      left: 0;
-      top: 0;
-      width: 100%;
-      height: 100%;
-      overflow: auto;
-      background-color: rgba(0,0,0,0.4);
-      justify-content: center;
-      align-items: center;
-    }
-    .modal-content {
-      background-color: #fefefe;
-      margin: auto;
-      padding: 24px;
-      border: 1px solid #888;
-      width: 90%;
-      max-width: 400px;
-      border-radius: 12px;
-      text-align: center;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    }
-    .close-button {
-      color: #aaa;
-      float: right;
-      font-size: 28px;
-      font-weight: bold;
-    }
-    .close-button:hover,
-    .close-button:focus {
-      color: #000;
-      cursor: pointer;
-    }
+    body { font-family: 'Inter', sans-serif; background:#f3f4f6; color:#1f2937; }
+    .glow { animation: glow 1.5s ease-in-out infinite; }
     @keyframes glow {
-      0%, 100% { box-shadow: 0 0 5px #4ade80, 0 0 10px #4ade80, 0 0 15px #4ade80; }
-      50% { box-shadow: 0 0 20px #4ade80, 0 0 30px #4ade80, 0 0 40px #4ade80; }
-    }
-    .glow {
-      animation: glow 1.5s ease-in-out infinite;
+      0%,100% { box-shadow:0 0 5px #4ade80,0 0 10px #4ade80; }
+      50% { box-shadow:0 0 20px #4ade80,0 0 40px #4ade80; }
     }
   </style>
 </head>
 <body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4">
 
-  <!-- Firebase Configuration Warning -->
-  <div id="configWarning" class="hidden w-full max-w-2xl bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4 rounded-lg" role="alert">
-    <p class="font-bold">Firebase Configuration Required!</p>
-    <p>Please update the <code>firebaseConfig</code> with your real Firebase project keys. The app will not work until this is done.</p>
-  </div>
-
   <div class="w-full max-w-2xl bg-white rounded-xl shadow-lg p-6 space-y-6">
     <h1 class="text-3xl font-bold text-center text-gray-800">Chat with Tokens</h1>
 
-    <!-- User Info and Online Count -->
+    <!-- User Info -->
     <div class="flex flex-col md:flex-row items-center justify-between p-3 bg-gray-50 rounded-lg">
       <div class="flex-1 flex items-center mb-2 md:mb-0">
         <span class="text-gray-600 font-medium mr-2">Online:</span>
@@ -81,214 +34,116 @@
     <!-- Chat History -->
     <div id="chatHistory" class="bg-gray-50 p-4 rounded-lg h-96 overflow-y-auto border border-gray-200 space-y-4"></div>
 
-    <!-- Chat Input Form -->
+    <!-- Input -->
     <div class="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4">
       <input type="text" id="messageInput" placeholder="Type your message..."
         class="flex-1 p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
       <button id="sendMessageButton"
-        class="bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-blue-700 transition duration-300 ease-in-out">
+        class="bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-blue-700">
         Send
-      </button>
-      <button id="pwaButton"
-        class="bg-green-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-green-700 transition duration-300 ease-in-out">
-        Pop TiffyAI on your Home screen
-      </button>
-    </div>
-  </div>
-
-  <!-- The Modals -->
-  <div id="tokenModal" class="modal">
-    <div class="modal-content">
-      <span class="close-button">&times;</span>
-      <p class="text-gray-700">Add Token button was clicked!</p>
-    </div>
-  </div>
-
-  <div id="nameModal" class="modal">
-    <div class="modal-content">
-      <h2 class="text-xl font-bold mb-4">Choose a Display Name</h2>
-      <input type="text" id="nameInput" placeholder="Your name"
-        class="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4">
-      <button id="saveNameButton"
-        class="w-full bg-blue-600 text-white font-semibold py-3 rounded-lg shadow-md hover:bg-blue-700 transition duration-300 ease-in-out">
-        Save
       </button>
     </div>
   </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
-    import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
-    import { getFirestore, collection, addDoc, serverTimestamp, onSnapshot, query, orderBy, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
+    import { getFirestore, collection, addDoc, serverTimestamp, onSnapshot, query, orderBy, doc, setDoc } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
 
-    // ✅ Replace with your real keys
+    // 🔑 Replace with YOUR Firebase config (real values from console)
     const firebaseConfig = {
-            apiKey: "AIzaSyD7ajxFTiETsJMg3nXC2i3-xMid70DEhjI",
-            authDomain: "tiffyai.firebaseapp.com",
-            projectId: "tiffyai",
-            storageBucket: "tiffyai.firebasestorage.app",
-            messagingSenderId: "1047156912441",
-            appId: "1:1047156912441:web:4e0979c965a5b4e63578e8",
-            measurementId: "G-TYC2YVJ49W"
-        };
-
-    const appId = firebaseConfig.projectId;
-    const initialAuthToken = null;
-
-    window.onload = function() {
-      let app, db, auth, userId = null, userName = 'Anonymous';
-      let previousOnlineCount = 0;
-      let hasUserInteracted = false;
-      const dingSound = new Audio('https://cdn.pixabay.com/download/audio/2021/08/04/audio_92425026c0.mp3?filename=ding-36029.mp3');
-
-      const chatHistoryElement = document.getElementById('chatHistory');
-      const messageInput = document.getElementById('messageInput');
-      const sendMessageButton = document.getElementById('sendMessageButton');
-      const pwaButton = document.getElementById('pwaButton');
-      const userNameElement = document.getElementById('userName');
-      const onlineCountElement = document.getElementById('onlineCount');
-      const configWarning = document.getElementById('configWarning');
-      const tokenModal = document.getElementById('tokenModal');
-      const nameModal = document.getElementById('nameModal');
-      const nameInput = document.getElementById('nameInput');
-      const saveNameButton = document.getElementById('saveNameButton');
-
-      const showModal = (m) => m.style.display = 'flex';
-      const hideModal = (m) => m.style.display = 'none';
-
-      const displayMessage = (text, senderName, isUser) => {
-        const messageDiv = document.createElement('div');
-        messageDiv.classList.add('flex','space-x-2','items-start','max-w-full');
-        messageDiv.classList.add(isUser ? 'justify-end' : 'justify-start');
-        const textDiv = document.createElement('div');
-        textDiv.classList.add('p-3','rounded-xl','max-w-xs','md:max-w-md','break-words');
-        if (isUser) textDiv.classList.add('bg-blue-500','text-white');
-        else textDiv.classList.add('bg-gray-200','text-gray-800');
-        const senderSpan = document.createElement('span');
-        senderSpan.classList.add('font-bold','block','mb-1');
-        senderSpan.textContent = senderName;
-        textDiv.appendChild(senderSpan);
-        textDiv.appendChild(document.createTextNode(text));
-        messageDiv.appendChild(textDiv);
-        chatHistoryElement.appendChild(messageDiv);
-        chatHistoryElement.scrollTop = chatHistoryElement.scrollHeight;
-      };
-
-      const saveUserName = async (name) => {
-        if (db && userId) {
-          const userDocRef = doc(db, `/artifacts/${appId}/users/${userId}/profile/data`);
-          await setDoc(userDocRef, { name: name });
-          userName = name;
-          userNameElement.textContent = userName;
-          hideModal(nameModal);
-          trackUserPresence();
-        }
-      };
-
-      const trackUserPresence = () => {
-        if (db && userId) {
-          const presenceDocRef = doc(db, `/artifacts/${appId}/public/data/online_users/${userId}`);
-          const updatePresence = () => {
-            setDoc(presenceDocRef, { last_seen: serverTimestamp() }, { merge: true });
-          };
-          updatePresence();
-          setInterval(updatePresence, 5000);
-        }
-      };
-
-      const sendMessage = async (text) => {
-        if (text.trim() === '') return;
-        if (!db || !userId) return;
-        await addDoc(collection(db, `/artifacts/${appId}/public/data/messages`), {
-          text, timestamp: serverTimestamp(), userId, userName
-        });
-        messageInput.value = '';
-      };
-
-      try {
-        app = initializeApp(firebaseConfig);
-        db = getFirestore(app);
-        auth = getAuth(app);
-        console.log("Firebase initialized successfully.");
-
-        onAuthStateChanged(auth, async (user) => {
-          if (user) {
-            userId = user.uid;
-            userNameElement.textContent = `User ID: ${userId}`;
-            const userDocRef = doc(db, `/artifacts/${appId}/users/${userId}/profile/data`);
-            const snap = await getDoc(userDocRef);
-            if (snap.exists() && snap.data().name) {
-              userName = snap.data().name;
-              userNameElement.textContent = userName;
-              trackUserPresence();
-            } else {
-              showModal(nameModal);
-            }
-
-            const messagesRef = collection(db, `/artifacts/${appId}/public/data/messages`);
-            const messagesQuery = query(messagesRef, orderBy('timestamp'));
-            onSnapshot(messagesQuery, (qs) => {
-              chatHistoryElement.innerHTML = '';
-              qs.forEach((doc) => {
-                const d = doc.data();
-                displayMessage(d.text, d.userName || 'Anonymous', d.userId === userId);
-              });
-            });
-
-            const onlineUsersRef = collection(db, `/artifacts/${appId}/public/data/online_users`);
-            onSnapshot(onlineUsersRef, (qs) => {
-              const now = Date.now();
-              const activeUsers = qs.docs.filter(doc => {
-                const d = doc.data();
-                return d.last_seen && (now - d.last_seen.toMillis()) < 10000;
-              });
-              const count = activeUsers.length;
-              onlineCountElement.textContent = count;
-              if (count > previousOnlineCount && hasUserInteracted) {
-                dingSound.play().catch(()=>{});
-              }
-              previousOnlineCount = count;
-            });
-          } else {
-            console.log("Signing in anonymously...");
-            if (initialAuthToken) {
-              signInWithCustomToken(auth, initialAuthToken).catch(()=>signInAnonymously(auth));
-            } else {
-              signInAnonymously(auth);
-            }
-          }
-        });
-      } catch (err) {
-        console.error("Firebase init failed:", err);
-        configWarning.classList.remove('hidden');
-      }
-
-      sendMessageButton.addEventListener('click', () => {
-        sendMessage(messageInput.value);
-        hasUserInteracted = true;
-      });
-      messageInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-          sendMessage(messageInput.value);
-          hasUserInteracted = true;
-        }
-      });
-      pwaButton.addEventListener('click', () => {
-        window.open('https://tiffyai.github.io/App/', '_blank');
-        hasUserInteracted = true;
-      });
-      const tokenModalCloseButton = tokenModal.querySelector('.close-button');
-      if (tokenModalCloseButton) tokenModalCloseButton.onclick = () => hideModal(tokenModal);
-      saveNameButton.addEventListener('click', () => {
-        if (nameInput.value.trim() !== '') {
-          saveUserName(nameInput.value.trim());
-          hasUserInteracted = true;
-        }
-      });
-      window.onclick = function(event) {
-        if (event.target === tokenModal) hideModal(tokenModal);
-      };
+      apiKey: "YOUR_API_KEY",
+      authDomain: "tiffyai.firebaseapp.com",
+      projectId: "tiffyai",
+      storageBucket: "tiffyai.appspot.com",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
     };
+
+    // Init
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    let userId = null;
+    let userName = "Anonymous";
+
+    const chatHistory = document.getElementById("chatHistory");
+    const input = document.getElementById("messageInput");
+    const sendBtn = document.getElementById("sendMessageButton");
+    const userNameEl = document.getElementById("userName");
+    const onlineCountEl = document.getElementById("onlineCount");
+
+    // Display message
+    function displayMessage(text, sender, isSelf) {
+      const div = document.createElement("div");
+      div.className = `flex ${isSelf ? "justify-end" : "justify-start"}`;
+      div.innerHTML = `
+        <div class="p-3 rounded-xl max-w-xs ${isSelf ? "bg-blue-500 text-white" : "bg-gray-200 text-gray-800"}">
+          <span class="font-bold block mb-1">${sender}</span>${text}
+        </div>`;
+      chatHistory.appendChild(div);
+      chatHistory.scrollTop = chatHistory.scrollHeight;
+    }
+
+    // Send message
+    async function sendMessage() {
+      const text = input.value.trim();
+      if (!text) return;
+      await addDoc(collection(db, "messages"), {
+        text,
+        userId,
+        userName,
+        timestamp: serverTimestamp()
+      });
+      input.value = "";
+    }
+
+    sendBtn.addEventListener("click", sendMessage);
+    input.addEventListener("keypress", e => { if (e.key === "Enter") sendMessage(); });
+
+    // Presence tracking
+    async function trackPresence(uid) {
+      const ref = doc(db, "online_users", uid);
+      setInterval(() => {
+        setDoc(ref, { last_seen: serverTimestamp() }, { merge: true });
+      }, 5000);
+    }
+
+    // Auth
+    onAuthStateChanged(auth, async user => {
+      if (user) {
+        userId = user.uid;
+        userNameEl.textContent = `User-${user.uid.slice(0, 5)}`;
+        userName = userNameEl.textContent;
+
+        // Track presence
+        trackPresence(userId);
+
+        // Listen messages
+        const q = query(collection(db, "messages"), orderBy("timestamp"));
+        onSnapshot(q, snap => {
+          chatHistory.innerHTML = "";
+          snap.forEach(doc => {
+            const d = doc.data();
+            displayMessage(d.text, d.userName || "Anonymous", d.userId === userId);
+          });
+        });
+
+        // Listen online users
+        onSnapshot(collection(db, "online_users"), snap => {
+          const now = Date.now();
+          const active = snap.docs.filter(d => {
+            const data = d.data();
+            return data.last_seen && now - data.last_seen.toMillis() < 10000;
+          });
+          onlineCountEl.textContent = active.length;
+        });
+
+      } else {
+        signInAnonymously(auth).catch(err => console.error(err));
+      }
+    });
   </script>
 </body>
 </html>
