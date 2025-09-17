@@ -28,9 +28,9 @@
         .modal-content {
             background-color: #fefefe;
             margin: auto;
-            padding: 20px;
+            padding: 24px;
             border: 1px solid #888;
-            width: 80%;
+            width: 90%;
             max-width: 400px;
             border-radius: 12px;
             text-align: center;
@@ -48,6 +48,13 @@
             text-decoration: none;
             cursor: pointer;
         }
+        @keyframes glow {
+            0%, 100% { box-shadow: 0 0 5px #4ade80, 0 0 10px #4ade80, 0 0 15px #4ade80; }
+            50% { box-shadow: 0 0 20px #4ade80, 0 0 30px #4ade80, 0 0 40px #4ade80; }
+        }
+        .glow {
+            animation: glow 1.5s ease-in-out infinite;
+        }
     </style>
 </head>
 <body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4">
@@ -55,10 +62,16 @@
     <div class="w-full max-w-2xl bg-white rounded-xl shadow-lg p-6 space-y-6">
         <h1 class="text-3xl font-bold text-center text-gray-800">Chat with Tokens</h1>
 
-        <!-- User ID Display -->
-        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-            <span class="text-gray-600 font-medium">User ID:</span>
-            <span id="userId" class="text-gray-800 font-mono text-sm">Loading...</span>
+        <!-- User Info and Online Count -->
+        <div class="flex flex-col md:flex-row items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <div class="flex-1 flex items-center mb-2 md:mb-0">
+                <span class="text-gray-600 font-medium mr-2">Online:</span>
+                <span id="onlineCount" class="text-green-500 font-bold text-lg glow">0</span>
+            </div>
+            <div class="flex-1 flex items-center justify-end">
+                <span class="text-gray-600 font-medium mr-2">You are:</span>
+                <span id="userName" class="text-gray-800 font-semibold text-base">Loading...</span>
+            </div>
         </div>
 
         <!-- Chat History -->
@@ -74,32 +87,43 @@
                     class="bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-blue-700 transition duration-300 ease-in-out">
                 Send
             </button>
-            <button id="addTokenButton"
+            <button id="pwaButton"
                     class="bg-green-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-green-700 transition duration-300 ease-in-out">
-                Add Token
+                Pop TiffyAI on your Home screen
             </button>
         </div>
-
     </div>
 
-    <!-- The Modal -->
-    <div id="myModal" class="modal">
+    <!-- The Modals -->
+    <div id="tokenModal" class="modal">
         <div class="modal-content">
             <span class="close-button">&times;</span>
-            <p>Add Token button was clicked!</p>
+            <p class="text-gray-700">Add Token button was clicked!</p>
+        </div>
+    </div>
+
+    <div id="nameModal" class="modal">
+        <div class="modal-content">
+            <h2 class="text-xl font-bold mb-4">Choose a Display Name</h2>
+            <input type="text" id="nameInput" placeholder="Your name"
+                   class="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4">
+            <button id="saveNameButton"
+                    class="w-full bg-blue-600 text-white font-semibold py-3 rounded-lg shadow-md hover:bg-blue-700 transition duration-300 ease-in-out">
+                Save
+            </button>
         </div>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, serverTimestamp, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, serverTimestamp, onSnapshot, query, orderBy, doc, getDoc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Firebase configuration and initialization
         let app;
         let db;
         let auth;
-        
+
         try {
             const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
             app = initializeApp(firebaseConfig);
@@ -109,20 +133,35 @@
             console.error("Firebase initialization failed:", e);
         }
 
-        // Global variables for App ID and user
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         let userId = null;
+        let userName = 'Anonymous';
 
+        // UI elements
         const chatHistoryElement = document.getElementById('chatHistory');
         const messageInput = document.getElementById('messageInput');
         const sendMessageButton = document.getElementById('sendMessageButton');
-        const addTokenButton = document.getElementById('addTokenButton');
-        const userIdElement = document.getElementById('userId');
-        const modal = document.getElementById('myModal');
-        const span = document.getElementsByClassName('close-button')[0];
+        const pwaButton = document.getElementById('pwaButton');
+        const userNameElement = document.getElementById('userName');
+        const onlineCountElement = document.getElementById('onlineCount');
 
-        // Function to display a message on the UI
-        const displayMessage = (text, isUser) => {
+        // Modals
+        const tokenModal = document.getElementById('tokenModal');
+        const nameModal = document.getElementById('nameModal');
+        const nameInput = document.getElementById('nameInput');
+        const saveNameButton = document.getElementById('saveNameButton');
+
+        // Functions to manage modal visibility
+        const showModal = (modalElement) => {
+            modalElement.style.display = 'flex';
+        };
+
+        const hideModal = (modalElement) => {
+            modalElement.style.display = 'none';
+        };
+
+        // Function to display a chat message on the UI
+        const displayMessage = (text, senderName, isUser) => {
             const messageDiv = document.createElement('div');
             messageDiv.classList.add('flex', 'space-x-2', 'items-start', 'max-w-full');
             messageDiv.classList.add(isUser ? 'justify-end' : 'justify-start');
@@ -134,36 +173,82 @@
             } else {
                 textDiv.classList.add('bg-gray-200', 'text-gray-800');
             }
-            textDiv.textContent = text;
+
+            const senderSpan = document.createElement('span');
+            senderSpan.classList.add('font-bold', 'block', 'mb-1');
+            senderSpan.textContent = senderName;
+
+            const textContent = document.createTextNode(text);
+
+            textDiv.appendChild(senderSpan);
+            textDiv.appendChild(textContent);
 
             messageDiv.appendChild(textDiv);
             chatHistoryElement.appendChild(messageDiv);
             chatHistoryElement.scrollTop = chatHistoryElement.scrollHeight;
         };
 
+        // Function to handle saving the user's name
+        const saveUserName = async (name) => {
+            if (db && userId) {
+                const userDocRef = doc(db, `/artifacts/${appId}/users/${userId}/profile/data`);
+                try {
+                    await setDoc(userDocRef, { name: name });
+                    userName = name;
+                    userNameElement.textContent = userName;
+                    hideModal(nameModal);
+                    console.log("Username saved:", name);
+                } catch (error) {
+                    console.error("Error saving username:", error);
+                }
+            }
+        };
+
         // Firebase Auth State Listener
-        if (auth) {
+        if (auth && db) {
             onAuthStateChanged(auth, async (user) => {
                 if (user) {
                     userId = user.uid;
-                    userIdElement.textContent = userId;
                     console.log("Authenticated with Firebase. User ID:", userId);
 
-                    // Set up real-time listener for chat messages
-                    if (db) {
-                        const messagesRef = collection(db, `/artifacts/${appId}/public/data/messages`);
-                        // Use a Firestore query to get messages ordered by timestamp
-                        const messagesQuery = query(messagesRef, orderBy('timestamp'));
-                        onSnapshot(messagesQuery, (querySnapshot) => {
-                            chatHistoryElement.innerHTML = '';
-                            querySnapshot.forEach((doc) => {
-                                const data = doc.data();
-                                displayMessage(data.text, data.userId === userId);
-                            });
-                        }, (error) => {
-                             console.error("Error listening to messages:", error);
-                        });
+                    // Check for and load user's name
+                    const userDocRef = doc(db, `/artifacts/${appId}/users/${userId}/profile/data`);
+                    const userDocSnap = await getDoc(userDocRef);
+                    if (userDocSnap.exists() && userDocSnap.data().name) {
+                        userName = userDocSnap.data().name;
+                        userNameElement.textContent = userName;
+                        // Start tracking presence
+                        trackUserPresence();
+                    } else {
+                        // Prompt for a name if it doesn't exist
+                        showModal(nameModal);
                     }
+
+                    // Set up real-time listener for chat messages
+                    const messagesRef = collection(db, `/artifacts/${appId}/public/data/messages`);
+                    const messagesQuery = query(messagesRef, orderBy('timestamp'));
+                    onSnapshot(messagesQuery, (querySnapshot) => {
+                        chatHistoryElement.innerHTML = '';
+                        querySnapshot.forEach((doc) => {
+                            const data = doc.data();
+                            displayMessage(data.text, data.userName || 'Anonymous', data.userId === userId);
+                        });
+                    }, (error) => {
+                         console.error("Error listening to messages:", error);
+                    });
+
+                    // Set up real-time listener for online users
+                    const onlineUsersRef = collection(db, `/artifacts/${appId}/public/data/online_users`);
+                    onSnapshot(onlineUsersRef, (querySnapshot) => {
+                        const now = Date.now();
+                        const activeUsers = querySnapshot.docs.filter(doc => {
+                            const data = doc.data();
+                            return data.last_seen && (now - data.last_seen.toMillis()) < 10000;
+                        });
+                        onlineCountElement.textContent = activeUsers.length;
+                    }, (error) => {
+                        console.error("Error listening to online users:", error);
+                    });
                 } else {
                     console.log("No user authenticated. Signing in anonymously...");
                     try {
@@ -180,6 +265,18 @@
             });
         }
 
+        // Function to periodically update user presence
+        const trackUserPresence = () => {
+            if (db && userId) {
+                const presenceDocRef = doc(db, `/artifacts/${appId}/public/data/online_users/${userId}`);
+                const updatePresence = () => {
+                    setDoc(presenceDocRef, { last_seen: serverTimestamp() }, { merge: true });
+                };
+                updatePresence(); // Initial update
+                setInterval(updatePresence, 5000); // Update every 5 seconds
+            }
+        };
+
         // Function to add a message to Firestore
         const sendMessage = async (text) => {
             if (text.trim() === '') return;
@@ -191,7 +288,8 @@
                 await addDoc(collection(db, `/artifacts/${appId}/public/data/messages`), {
                     text: text,
                     timestamp: serverTimestamp(),
-                    userId: userId
+                    userId: userId,
+                    userName: userName // Include the user's name
                 });
                 messageInput.value = '';
             } catch (error) {
@@ -210,20 +308,33 @@
             }
         });
 
-        addTokenButton.addEventListener('click', () => {
-            modal.style.display = 'flex';
+        // Event listener for the new PWA button
+        pwaButton.addEventListener('click', () => {
+            window.open('https://tiffyai.github.io/App/', '_blank');
         });
 
-        span.onclick = function() {
-            modal.style.display = 'none';
-        };
+        // Modal event listeners
+        const tokenModalCloseButton = document.getElementById('tokenModal').querySelector('.close-button');
+        if (tokenModalCloseButton) {
+            tokenModalCloseButton.onclick = () => {
+                hideModal(tokenModal);
+            };
+        }
+
+        saveNameButton.addEventListener('click', () => {
+            if (nameInput.value.trim() !== '') {
+                saveUserName(nameInput.value.trim());
+            } else {
+                // This app doesn't use `alert()`, so let's log an error instead.
+                console.error('Please enter a name.');
+            }
+        });
 
         window.onclick = function(event) {
-            if (event.target == modal) {
-                modal.style.display = 'none';
+            if (event.target === tokenModal) {
+                hideModal(tokenModal);
             }
         };
     </script>
-
 </body>
 </html>
