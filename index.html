@@ -59,6 +59,8 @@
 </head>
 <body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4">
 
+    <!-- The warning div for API key errors has been removed because the code now uses the correct global variables. -->
+
     <div class="w-full max-w-2xl bg-white rounded-xl shadow-lg p-6 space-y-6">
         <h1 class="text-3xl font-bold text-center text-gray-800">Chat with Tokens</h1>
 
@@ -116,26 +118,23 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, serverTimestamp, onSnapshot, query, orderBy, doc, getDoc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, serverTimestamp, onSnapshot, query, orderBy, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Firebase configuration and initialization
+        // This app uses global variables provided by the environment for Firebase configuration
+        // and initial authentication.
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // Firebase initialization
         let app;
         let db;
         let auth;
-
-        try {
-            const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-            app = initializeApp(firebaseConfig);
-            db = getFirestore(app);
-            auth = getAuth(app);
-        } catch (e) {
-            console.error("Firebase initialization failed:", e);
-        }
-
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         let userId = null;
         let userName = 'Anonymous';
+        let previousOnlineCount = 0;
+        const dingSound = new Audio('https://cdn.pixabay.com/download/audio/2021/08/04/audio_92425026c0.mp3?filename=ding-36029.mp3');
 
         // UI elements
         const chatHistoryElement = document.getElementById('chatHistory');
@@ -204,12 +203,18 @@
             }
         };
 
-        // Firebase Auth State Listener
-        if (auth && db) {
+        // Check if Firebase config is available before proceeding
+        if (firebaseConfig) {
+            app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+            
+            // Firebase Auth State Listener
             onAuthStateChanged(auth, async (user) => {
                 if (user) {
                     userId = user.uid;
                     console.log("Authenticated with Firebase. User ID:", userId);
+                    userNameElement.textContent = `User ID: ${userId}`; // Show the full User ID
 
                     // Check for and load user's name
                     const userDocRef = doc(db, `/artifacts/${appId}/users/${userId}/profile/data`);
@@ -245,96 +250,103 @@
                             const data = doc.data();
                             return data.last_seen && (now - data.last_seen.toMillis()) < 10000;
                         });
-                        onlineCountElement.textContent = activeUsers.length;
+                        
+                        const currentOnlineCount = activeUsers.length;
+                        onlineCountElement.textContent = currentOnlineCount;
+
+                        if (currentOnlineCount > previousOnlineCount) {
+                            dingSound.play();
+                        }
+                        previousOnlineCount = currentOnlineCount;
                     }, (error) => {
                         console.error("Error listening to online users:", error);
                     });
                 } else {
-                    console.log("No user authenticated. Signing in anonymously...");
+                    console.log("No user authenticated. Authenticating...");
                     try {
-                        const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-                        if (token) {
-                            await signInWithCustomToken(auth, token);
+                        if (initialAuthToken) {
+                            await signInWithCustomToken(auth, initialAuthToken);
                         } else {
                             await signInAnonymously(auth);
                         }
                     } catch (error) {
-                        console.error("Error signing in:", error);
+                        console.error("Error during authentication:", error);
                     }
                 }
             });
-        }
 
-        // Function to periodically update user presence
-        const trackUserPresence = () => {
-            if (db && userId) {
-                const presenceDocRef = doc(db, `/artifacts/${appId}/public/data/online_users/${userId}`);
-                const updatePresence = () => {
-                    setDoc(presenceDocRef, { last_seen: serverTimestamp() }, { merge: true });
-                };
-                updatePresence(); // Initial update
-                setInterval(updatePresence, 5000); // Update every 5 seconds
-            }
-        };
-
-        // Function to add a message to Firestore
-        const sendMessage = async (text) => {
-            if (text.trim() === '') return;
-            if (!db || !userId) {
-                console.error("Firestore DB not initialized or User not authenticated.");
-                return;
-            }
-            try {
-                await addDoc(collection(db, `/artifacts/${appId}/public/data/messages`), {
-                    text: text,
-                    timestamp: serverTimestamp(),
-                    userId: userId,
-                    userName: userName // Include the user's name
-                });
-                messageInput.value = '';
-            } catch (error) {
-                console.error("Error adding message to Firestore:", error);
-            }
-        };
-
-        // Event Listeners
-        sendMessageButton.addEventListener('click', () => {
-            sendMessage(messageInput.value);
-        });
-
-        messageInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                sendMessage(messageInput.value);
-            }
-        });
-
-        // Event listener for the new PWA button
-        pwaButton.addEventListener('click', () => {
-            window.open('https://tiffyai.github.io/App/', '_blank');
-        });
-
-        // Modal event listeners
-        const tokenModalCloseButton = document.getElementById('tokenModal').querySelector('.close-button');
-        if (tokenModalCloseButton) {
-            tokenModalCloseButton.onclick = () => {
-                hideModal(tokenModal);
+            // Function to periodically update user presence
+            const trackUserPresence = () => {
+                if (db && userId) {
+                    const presenceDocRef = doc(db, `/artifacts/${appId}/public/data/online_users/${userId}`);
+                    const updatePresence = () => {
+                        setDoc(presenceDocRef, { last_seen: serverTimestamp() }, { merge: true });
+                    };
+                    updatePresence(); // Initial update
+                    setInterval(updatePresence, 5000); // Update every 5 seconds
+                }
             };
+
+            // Function to add a message to Firestore
+            const sendMessage = async (text) => {
+                if (text.trim() === '') return;
+                if (!db || !userId) {
+                    console.error("Firestore DB not initialized or User not authenticated.");
+                    return;
+                }
+                try {
+                    await addDoc(collection(db, `/artifacts/${appId}/public/data/messages`), {
+                        text: text,
+                        timestamp: serverTimestamp(),
+                        userId: userId,
+                        userName: userName // Include the user's name
+                    });
+                    messageInput.value = '';
+                } catch (error) {
+                    console.error("Error adding message to Firestore:", error);
+                }
+            };
+            
+            // Event Listeners
+            sendMessageButton.addEventListener('click', () => {
+                sendMessage(messageInput.value);
+            });
+
+            messageInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    sendMessage(messageInput.value);
+                }
+            });
+
+            // Event listener for the new PWA button
+            pwaButton.addEventListener('click', () => {
+                window.open('https://tiffyai.github.io/App/', '_blank');
+            });
+            
+            // Modal event listeners
+            const tokenModalCloseButton = document.getElementById('tokenModal').querySelector('.close-button');
+            if (tokenModalCloseButton) {
+                tokenModalCloseButton.onclick = () => {
+                    hideModal(tokenModal);
+                };
+            }
+
+            saveNameButton.addEventListener('click', () => {
+                if (nameInput.value.trim() !== '') {
+                    saveUserName(nameInput.value.trim());
+                } else {
+                    console.error('Please enter a name.');
+                }
+            });
+
+            window.onclick = function(event) {
+                if (event.target === tokenModal) {
+                    hideModal(tokenModal);
+                }
+            };
+        } else {
+             console.error("Firebase configuration is not available.");
         }
-
-        saveNameButton.addEventListener('click', () => {
-            if (nameInput.value.trim() !== '') {
-                saveUserName(nameInput.value.trim());
-            } else {
-                // This app doesn't use `alert()`, so let's log an error instead.
-                console.error('Please enter a name.');
-            }
-        });
-
-        window.onclick = function(event) {
-            if (event.target === tokenModal) {
-                hideModal(tokenModal);
-            }
-        };
     </script>
 </body>
 </html>
