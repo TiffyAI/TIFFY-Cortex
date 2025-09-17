@@ -121,9 +121,9 @@
     </div>
 
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, serverTimestamp, onSnapshot, query, orderBy, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, serverTimestamp, onSnapshot, query, orderBy, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
 
         // IMPORTANT: Paste your full, un-redacted Firebase project configuration here.
         // It's the only way for the app to connect to your database.
@@ -257,7 +257,7 @@
             // --- Main Application Logic ---
 
             // Check if Firebase config is valid before proceeding
-            if (firebaseConfig && firebaseConfig.projectId && firebaseConfig.apiKey !== "YOUR_API_KEY") {
+            if (firebaseConfig && firebaseConfig.projectId && firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY") {
                 try {
                     app = initializeApp(firebaseConfig);
                     db = getFirestore(app);
