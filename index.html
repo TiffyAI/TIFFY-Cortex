@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat with Tokens</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            color: #1f2937;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgb(0,0,0);
+            background-color: rgba(0,0,0,0.4);
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 400px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .close-button {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .close-button:hover,
+        .close-button:focus {
+            color: #000;
+            text-decoration: none;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-2xl bg-white rounded-xl shadow-lg p-6 space-y-6">
+        <h1 class="text-3xl font-bold text-center text-gray-800">Chat with Tokens</h1>
+
+        <!-- User ID Display -->
+        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <span class="text-gray-600 font-medium">User ID:</span>
+            <span id="userId" class="text-gray-800 font-mono text-sm">Loading...</span>
+        </div>
+
+        <!-- Chat History -->
+        <div id="chatHistory" class="bg-gray-50 p-4 rounded-lg h-96 overflow-y-auto border border-gray-200 space-y-4">
+            <!-- Chat messages will be appended here -->
+        </div>
+
+        <!-- Chat Input Form -->
+        <div class="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4">
+            <input type="text" id="messageInput" placeholder="Type your message..."
+                   class="flex-1 p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <button id="sendMessageButton"
+                    class="bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-blue-700 transition duration-300 ease-in-out">
+                Send
+            </button>
+            <button id="addTokenButton"
+                    class="bg-green-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-green-700 transition duration-300 ease-in-out">
+                Add Token
+            </button>
+        </div>
+
+    </div>
+
+    <!-- The Modal -->
+    <div id="myModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <p>Add Token button was clicked!</p>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, serverTimestamp, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Firebase configuration and initialization
+        let app;
+        let db;
+        let auth;
+        
+        try {
+            const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+            app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+        } catch (e) {
+            console.error("Firebase initialization failed:", e);
+        }
+
+        // Global variables for App ID and user
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        let userId = null;
+
+        const chatHistoryElement = document.getElementById('chatHistory');
+        const messageInput = document.getElementById('messageInput');
+        const sendMessageButton = document.getElementById('sendMessageButton');
+        const addTokenButton = document.getElementById('addTokenButton');
+        const userIdElement = document.getElementById('userId');
+        const modal = document.getElementById('myModal');
+        const span = document.getElementsByClassName('close-button')[0];
+
+        // Function to display a message on the UI
+        const displayMessage = (text, isUser) => {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('flex', 'space-x-2', 'items-start', 'max-w-full');
+            messageDiv.classList.add(isUser ? 'justify-end' : 'justify-start');
+
+            const textDiv = document.createElement('div');
+            textDiv.classList.add('p-3', 'rounded-xl', 'max-w-xs', 'md:max-w-md', 'break-words');
+            if (isUser) {
+                textDiv.classList.add('bg-blue-500', 'text-white');
+            } else {
+                textDiv.classList.add('bg-gray-200', 'text-gray-800');
+            }
+            textDiv.textContent = text;
+
+            messageDiv.appendChild(textDiv);
+            chatHistoryElement.appendChild(messageDiv);
+            chatHistoryElement.scrollTop = chatHistoryElement.scrollHeight;
+        };
+
+        // Firebase Auth State Listener
+        if (auth) {
+            onAuthStateChanged(auth, async (user) => {
+                if (user) {
+                    userId = user.uid;
+                    userIdElement.textContent = userId;
+                    console.log("Authenticated with Firebase. User ID:", userId);
+
+                    // Set up real-time listener for chat messages
+                    if (db) {
+                        const messagesRef = collection(db, `/artifacts/${appId}/public/data/messages`);
+                        // Use a Firestore query to get messages ordered by timestamp
+                        const messagesQuery = query(messagesRef, orderBy('timestamp'));
+                        onSnapshot(messagesQuery, (querySnapshot) => {
+                            chatHistoryElement.innerHTML = '';
+                            querySnapshot.forEach((doc) => {
+                                const data = doc.data();
+                                displayMessage(data.text, data.userId === userId);
+                            });
+                        }, (error) => {
+                             console.error("Error listening to messages:", error);
+                        });
+                    }
+                } else {
+                    console.log("No user authenticated. Signing in anonymously...");
+                    try {
+                        const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+                        if (token) {
+                            await signInWithCustomToken(auth, token);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    } catch (error) {
+                        console.error("Error signing in:", error);
+                    }
+                }
+            });
+        }
+
+        // Function to add a message to Firestore
+        const sendMessage = async (text) => {
+            if (text.trim() === '') return;
+            if (!db || !userId) {
+                console.error("Firestore DB not initialized or User not authenticated.");
+                return;
+            }
+            try {
+                await addDoc(collection(db, `/artifacts/${appId}/public/data/messages`), {
+                    text: text,
+                    timestamp: serverTimestamp(),
+                    userId: userId
+                });
+                messageInput.value = '';
+            } catch (error) {
+                console.error("Error adding message to Firestore:", error);
+            }
+        };
+
+        // Event Listeners
+        sendMessageButton.addEventListener('click', () => {
+            sendMessage(messageInput.value);
+        });
+
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage(messageInput.value);
+            }
+        });
+
+        addTokenButton.addEventListener('click', () => {
+            modal.style.display = 'flex';
+        });
+
+        span.onclick = function() {
+            modal.style.display = 'none';
+        };
+
+        window.onclick = function(event) {
+            if (event.target == modal) {
+                modal.style.display = 'none';
+            }
+        };
+    </script>
+
+</body>
+</html>
