@@ -128,115 +128,120 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, serverTimestamp, onSnapshot, query, orderBy, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, serverTimestamp, onSnapshot, query, orderBy, doc, getDoc, setDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-analytics.js";
 
+        // Set Firebase debug log level
+        setLogLevel('debug');
+
         // This is your Firebase project configuration. You must paste all seven keys here.
-        const firebaseConfig = {
-    apiKey: "AIzaSyD7ajxFTiETsJMg3nXC2i3-xMid70DEhjI",
-    authDomain: "tiffyai.firebaseapp.com",
-    projectId: "tiffyai",
-    storageBucket: "tiffyai.firebasestorage.app",
-    messagingSenderId: "1047156912441",
-    appId: "1:1047156912441:web:4e0979c965a5b4e63578e8",
-    measurementId: "G-TYC2YVJ49W"
-  };
+        const localFirebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID",
+            measurementId: "YOUR_MEASUREMENT_ID"
+        };
         
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : localFirebaseConfig;
         
         const appId = typeof __app_id !== 'undefined' ? __app_id : firebaseConfig.projectId;
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
-        window.onload = function() {
-            let app, db, auth, userId = null, userName = 'Anonymous', previousOnlineCount = 0;
-            let hasUserInteracted = false;
-            const dingSound = new Audio('https://cdn.pixabay.com/download/audio/2021/08/04/audio_92425026c0.mp3?filename=ding-36029.mp3');
+        
+        let app, db, auth, userId = null, userName = 'Anonymous', previousOnlineCount = 0;
+        let hasUserInteracted = false;
+        const dingSound = new Audio('https://cdn.pixabay.com/download/audio/2021/08/04/audio_92425026c0.mp3?filename=ding-36029.mp3');
 
-            const chatHistoryElement = document.getElementById('chatHistory');
-            const messageInput = document.getElementById('messageInput');
-            const sendMessageButton = document.getElementById('sendMessageButton');
-            const userNameElement = document.getElementById('userName');
-            const onlineCountElement = document.getElementById('onlineCount');
-            const configWarning = document.getElementById('configWarning');
-            const statusMessage = document.getElementById('statusMessage');
-            const nameModal = document.getElementById('nameModal');
-            const nameInput = document.getElementById('nameInput');
-            const saveNameButton = document.getElementById('saveNameButton');
+        const chatHistoryElement = document.getElementById('chatHistory');
+        const messageInput = document.getElementById('messageInput');
+        const sendMessageButton = document.getElementById('sendMessageButton');
+        const userNameElement = document.getElementById('userName');
+        const onlineCountElement = document.getElementById('onlineCount');
+        const configWarning = document.getElementById('configWarning');
+        const statusMessage = document.getElementById('statusMessage');
+        const nameModal = document.getElementById('nameModal');
+        const nameInput = document.getElementById('nameInput');
+        const saveNameButton = document.getElementById('saveNameButton');
 
-            const updateStatus = (message) => {
-                if (statusMessage) {
-                    statusMessage.textContent = `Status: ${message}`;
-                }
-            };
-            const showModal = (modalElement) => { modalElement.style.display = 'flex'; };
-            const hideModal = (modalElement) => { modalElement.style.display = 'none'; };
-            const displayMessage = (text, senderName, isUser) => {
-                const messageDiv = document.createElement('div');
-                messageDiv.classList.add('flex', 'space-x-2', 'items-start', 'max-w-full', isUser ? 'justify-end' : 'justify-start');
-                const textDiv = document.createElement('div');
-                textDiv.classList.add('p-3', 'rounded-xl', 'max-w-xs', 'md:max-w-md', 'break-words', isUser ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-800');
-                textDiv.innerHTML = `<span class="font-bold block mb-1">${senderName}</span>${text}`;
-                messageDiv.appendChild(textDiv);
-                chatHistoryElement.appendChild(messageDiv);
-                chatHistoryElement.scrollTop = chatHistoryElement.scrollHeight;
-            };
-            const saveUserName = async (name) => {
-                if (!db || !userId) return;
-                try {
-                    const userDocRef = doc(db, `/artifacts/${appId}/users/${userId}/profile/data`);
-                    await setDoc(userDocRef, { name: name });
-                    userName = name;
-                    userNameElement.textContent = userName;
-                    hideModal(nameModal);
-                    updateStatus("Username saved. Tracking presence...");
-                    trackUserPresence();
-                } catch (error) {
-                    console.error("Error saving username:", error);
-                    updateStatus("Error saving username. Check console for details.");
-                }
-            };
-            const trackUserPresence = () => {
-                if (!db || !userId) return;
-                const presenceDocRef = doc(db, `/artifacts/${appId}/public/data/online_users/${userId}`);
-                const updatePresence = () => { setDoc(presenceDocRef, { last_seen: serverTimestamp() }, { merge: true }); };
-                updatePresence();
-                setInterval(updatePresence, 5000);
-            };
-            const sendMessage = async (text) => {
-                if (text.trim() === '' || !db || !userId) {
-                    updateStatus("Can't send message. Not authenticated or message is empty.");
-                    return;
-                }
-                try {
-                    await addDoc(collection(db, `/artifacts/${appId}/public/data/messages`), {
-                        text: text,
-                        timestamp: serverTimestamp(),
-                        userId: userId,
-                        userName: userName
-                    });
-                    messageInput.value = '';
-                    updateStatus("Message sent!");
-                } catch (error) {
-                console.error("Error adding message to Firestore:", error);
-                updateStatus("Error sending message. Check console for details.");
+        const updateStatus = (message) => {
+            if (statusMessage) {
+                statusMessage.textContent = `Status: ${message}`;
             }
-            };
+        };
+        const showModal = (modalElement) => { modalElement.style.display = 'flex'; };
+        const hideModal = (modalElement) => { modalElement.style.display = 'none'; };
+        const displayMessage = (text, senderName, isUser) => {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('flex', 'space-x-2', 'items-start', 'max-w-full', isUser ? 'justify-end' : 'justify-start');
+            const textDiv = document.createElement('div');
+            const dynamicClasses = isUser ? ['bg-blue-500', 'text-white'] : ['bg-gray-200', 'text-gray-800'];
+            textDiv.classList.add('p-3', 'rounded-xl', 'max-w-xs', 'md:max-w-md', 'break-words', ...dynamicClasses);
+            textDiv.innerHTML = `<span class="font-bold block mb-1">${senderName}</span>${text}`;
+            messageDiv.appendChild(textDiv);
+            chatHistoryElement.appendChild(messageDiv);
+            chatHistoryElement.scrollTop = chatHistoryElement.scrollHeight;
+        };
+        const saveUserName = async (name) => {
+            if (!db || !userId) return;
+            try {
+                const userDocRef = doc(db, `/artifacts/${appId}/users/${userId}/profile/data`);
+                await setDoc(userDocRef, { name: name });
+                userName = name;
+                userNameElement.textContent = userName;
+                hideModal(nameModal);
+                updateStatus("Username saved. Tracking presence...");
+                trackUserPresence();
+            } catch (error) {
+                console.error("Error saving username:", error);
+                updateStatus("Error saving username. Check console for details.");
+            }
+        };
+        const trackUserPresence = () => {
+            if (!db || !userId) return;
+            const presenceDocRef = doc(db, `/artifacts/${appId}/public/data/online_users/${userId}`);
+            const updatePresence = () => { setDoc(presenceDocRef, { last_seen: serverTimestamp() }, { merge: true }); };
+            updatePresence();
+            setInterval(updatePresence, 5000);
+        };
+        const sendMessage = async (text) => {
+            if (text.trim() === '' || !db || !userId) {
+                updateStatus("Can't send message. Not authenticated or message is empty.");
+                return;
+            }
+            try {
+                await addDoc(collection(db, `/artifacts/${appId}/public/data/messages`), {
+                    text: text,
+                    timestamp: serverTimestamp(),
+                    userId: userId,
+                    userName: userName
+                });
+                messageInput.value = '';
+                updateStatus("Message sent!");
+            } catch (error) {
+            console.error("Error adding message to Firestore:", error);
+            updateStatus("Error sending message. Check console for details.");
+        }
+        };
 
-            updateStatus("Checking Firebase configuration...");
-            if (firebaseConfig && firebaseConfig.projectId && firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY") {
-                updateStatus("Firebase configuration found. Initializing app...");
-                try {
-                    app = initializeApp(firebaseConfig);
-                    db = getFirestore(app);
-                    auth = getAuth(app);
-                    getAnalytics(app);
-                    updateStatus("Firebase initialized. Authenticating user...");
+        updateStatus("Checking Firebase configuration...");
+        if (firebaseConfig && firebaseConfig.projectId && firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY") {
+            updateStatus("Firebase configuration found. Initializing app...");
+            try {
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                getAnalytics(app);
+                updateStatus("Firebase initialized. Authenticating user...");
 
-                    onAuthStateChanged(auth, async (user) => {
-                        if (user) {
-                            userId = user.uid;
-                            updateStatus(`Authenticated! User ID: ${userId}`);
-                            const userDocRef = doc(db, `/artifacts/${appId}/users/${userId}/profile/data`);
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        updateStatus(`Authenticated! User ID: ${userId}`);
+                        const userDocRef = doc(db, `/artifacts/${appId}/users/${userId}/profile/data`);
+                        try {
                             const userDocSnap = await getDoc(userDocRef);
                             if (userDocSnap.exists() && userDocSnap.data().name) {
                                 userName = userDocSnap.data().name;
@@ -247,68 +252,71 @@
                                 updateStatus("First time user. Showing name modal...");
                                 showModal(nameModal);
                             }
-
-                            const messagesRef = collection(db, `/artifacts/${appId}/public/data/messages`);
-                            const messagesQuery = query(messagesRef, orderBy('timestamp'));
-                            onSnapshot(messagesQuery, (querySnapshot) => {
-                                chatHistoryElement.innerHTML = '';
-                                querySnapshot.forEach((doc) => {
-                                    const data = doc.data();
-                                    displayMessage(data.text, data.userName || 'Anonymous', data.userId === userId);
-                                });
-                                updateStatus("Messages loaded!");
-                            }, (error) => {
-                                console.error("Error listening to messages:", error);
-                                updateStatus("Error loading messages. Check console.");
-                            });
-
-                            const onlineUsersRef = collection(db, `/artifacts/${appId}/public/data/online_users`);
-                            onSnapshot(onlineUsersRef, (querySnapshot) => {
-                                const now = Date.now();
-                                const activeUsers = querySnapshot.docs.filter(doc => doc.data().last_seen && (now - doc.data().last_seen.toMillis()) < 10000);
-                                const currentOnlineCount = activeUsers.length;
-                                onlineCountElement.textContent = currentOnlineCount;
-                                if (currentOnlineCount > previousOnlineCount && hasUserInteracted) {
-                                    dingSound.play().catch(e => console.log("Audio playback blocked."));
-                                }
-                                previousOnlineCount = currentOnlineCount;
-                            }, (error) => {
-                                console.error("Error listening to online users:", error);
-                            });
-
-                        } else {
-                            updateStatus("No user found. Signing in anonymously...");
-                            try {
-                                if (initialAuthToken) {
-                                    signInWithCustomToken(auth, initialAuthToken).catch(err => signInAnonymously(auth));
-                                } else {
-                                    signInAnonymously(auth);
-                                }
-                            } catch (error) {
-                                console.error("Error during authentication:", error);
-                                updateStatus("Authentication failed. Check console.");
-                            }
+                        } catch (docError) {
+                            console.error("Error fetching user document:", docError);
+                            updateStatus(`Error fetching user doc: ${docError.message}`);
                         }
-                    });
 
-                } catch (error) {
-                    console.error("Firebase initialization failed:", error);
-                    updateStatus(`Initialization failed: ${error.message}`);
-                    configWarning.classList.remove('hidden');
-                }
-            } else {
-                updateStatus("Firebase configuration is missing or incorrect.");
+                        const messagesRef = collection(db, `/artifacts/${appId}/public/data/messages`);
+                        const messagesQuery = query(messagesRef, orderBy('timestamp'));
+                        onSnapshot(messagesQuery, (querySnapshot) => {
+                            chatHistoryElement.innerHTML = '';
+                            querySnapshot.forEach((doc) => {
+                                const data = doc.data();
+                                displayMessage(data.text, data.userName || 'Anonymous', data.userId === userId);
+                            });
+                            updateStatus("Messages loaded!");
+                        }, (error) => {
+                            console.error("Error listening to messages:", error);
+                            updateStatus("Error loading messages. Check console.");
+                        });
+
+                        const onlineUsersRef = collection(db, `/artifacts/${appId}/public/data/online_users`);
+                        onSnapshot(onlineUsersRef, (querySnapshot) => {
+                            const now = Date.now();
+                            const activeUsers = querySnapshot.docs.filter(doc => doc.data().last_seen && (now - doc.data().last_seen.toMillis()) < 10000);
+                            const currentOnlineCount = activeUsers.length;
+                            onlineCountElement.textContent = currentOnlineCount;
+                            if (currentOnlineCount > previousOnlineCount && hasUserInteracted) {
+                                dingSound.play().catch(e => console.log("Audio playback blocked."));
+                            }
+                            previousOnlineCount = currentOnlineCount;
+                        }, (error) => {
+                            console.error("Error listening to online users:", error);
+                        });
+
+                    } else {
+                        updateStatus("No user found. Signing in anonymously...");
+                        try {
+                            if (initialAuthToken) {
+                                signInWithCustomToken(auth, initialAuthToken).catch(err => signInAnonymously(auth));
+                            } else {
+                                signInAnonymously(auth);
+                            }
+                        } catch (error) {
+                            console.error("Error during authentication:", error);
+                            updateStatus("Authentication failed. Check console.");
+                        }
+                    }
+                });
+
+            } catch (error) {
+                console.error("Firebase initialization failed:", error);
+                updateStatus(`Initialization failed: ${error.message}`);
                 configWarning.classList.remove('hidden');
             }
+        } else {
+            updateStatus("Firebase configuration is missing or incorrect.");
+            configWarning.classList.remove('hidden');
+        }
 
-            sendMessageButton.addEventListener('click', () => { sendMessage(messageInput.value); hasUserInteracted = true; });
-            messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') { sendMessage(messageInput.value); hasUserInteracted = true; } });
-            document.getElementById('pwaButton').addEventListener('click', () => { window.open('https://tiffyai.github.io/App/', '_blank'); hasUserInteracted = true; });
-            const tokenModalCloseButton = document.getElementById('tokenModal').querySelector('.close-button');
-            if (tokenModalCloseButton) { tokenModalCloseButton.onclick = () => { hideModal(document.getElementById('tokenModal')); }; }
-            saveNameButton.addEventListener('click', () => { if (nameInput.value.trim() !== '') { saveUserName(nameInput.value.trim()); hasUserInteracted = true; } else { console.error('Please enter a name.'); } });
-            window.onclick = function(event) { if (event.target === document.getElementById('tokenModal')) { hideModal(document.getElementById('tokenModal')); } };
-        };
+        sendMessageButton.addEventListener('click', () => { sendMessage(messageInput.value); hasUserInteracted = true; });
+        messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') { sendMessage(messageInput.value); hasUserInteracted = true; } });
+        document.getElementById('pwaButton').addEventListener('click', () => { window.open('https://tiffyai.github.io/App/', '_blank'); hasUserInteracted = true; });
+        const tokenModalCloseButton = document.getElementById('tokenModal').querySelector('.close-button');
+        if (tokenModalCloseButton) { tokenModalCloseButton.onclick = () => { hideModal(document.getElementById('tokenModal')); }; }
+        saveNameButton.addEventListener('click', () => { if (nameInput.value.trim() !== '') { saveUserName(nameInput.value.trim()); hasUserInteracted = true; } else { console.error('Please enter a name.'); } });
+        window.onclick = function(event) { if (event.target === document.getElementById('tokenModal')) { hideModal(document.getElementById('tokenModal')); } };
     </script>
 </body>
 </html>
