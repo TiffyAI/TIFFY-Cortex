@@ -136,13 +136,13 @@
 
         // This is your Firebase project configuration. You must paste all seven keys here.
         const firebaseConfig = {
-          apiKey: "AIzaSyD7ajxFTiETsJMg3nXC2i3-xMid70DEhjI",
-          authDomain: "tiffyai.firebaseapp.com",
-          projectId: "tiffyai",
-          storageBucket: "tiffyai.firebasestorage.app",
-          messagingSenderId: "1047156912441",
-          appId: "1:1047156912441:web:4e0979c965a5b4e63578e8",
-          measurementId: "G-TYC2YVJ49W"
+            apiKey: "AIzaSyD7ajxFTiETsJMg3nXC2i3-xMid70DEhjI",
+            authDomain: "tiffyai.firebaseapp.com",
+            projectId: "tiffyai",
+            storageBucket: "tiffyai.firebasestorage.app",
+            messagingSenderId: "1047156912441",
+            appId: "1:1047156912441:web:4e0979c965a5b4e63578e8",
+            measurementId: "G-TYC2YVJ49W"
         };
         
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : localFirebaseConfig;
@@ -177,8 +177,12 @@
             const messageDiv = document.createElement('div');
             messageDiv.classList.add('flex', 'space-x-2', 'items-start', 'max-w-full', isUser ? 'justify-end' : 'justify-start');
             const textDiv = document.createElement('div');
-            const dynamicClasses = isUser ? ['bg-blue-500', 'text-white'] : ['bg-gray-200', 'text-gray-800'];
-            textDiv.classList.add('p-3', 'rounded-xl', 'max-w-xs', 'md:max-w-md', 'break-words', ...dynamicClasses);
+            textDiv.classList.add('p-3', 'rounded-xl', 'max-w-xs', 'md:max-w-md', 'break-words');
+            if (isUser) {
+                textDiv.classList.add('bg-blue-500', 'text-white');
+            } else {
+                textDiv.classList.add('bg-gray-200', 'text-gray-800');
+            }
             textDiv.innerHTML = `<span class="font-bold block mb-1">${senderName}</span>${text}`;
             messageDiv.appendChild(textDiv);
             chatHistoryElement.appendChild(messageDiv);
