@@ -134,6 +134,7 @@
         let userId = null;
         let userName = 'Anonymous';
         let previousOnlineCount = 0;
+        let hasUserInteracted = false; // New flag to track user interaction
         const dingSound = new Audio('https://cdn.pixabay.com/download/audio/2021/08/04/audio_92425026c0.mp3?filename=ding-36029.mp3');
 
         // UI elements
@@ -254,8 +255,12 @@
                         const currentOnlineCount = activeUsers.length;
                         onlineCountElement.textContent = currentOnlineCount;
 
-                        if (currentOnlineCount > previousOnlineCount) {
-                            dingSound.play();
+                        // Only play the sound if the user has interacted with the page
+                        if (currentOnlineCount > previousOnlineCount && hasUserInteracted) {
+                            dingSound.play().catch(e => {
+                                // Catch and handle the promise rejection to prevent console errors.
+                                console.log("Audio playback was blocked by the browser. Please interact with the page to enable sound.");
+                            });
                         }
                         previousOnlineCount = currentOnlineCount;
                     }, (error) => {
@@ -310,17 +315,20 @@
             // Event Listeners
             sendMessageButton.addEventListener('click', () => {
                 sendMessage(messageInput.value);
+                hasUserInteracted = true; // Set flag on button click
             });
 
             messageInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') {
                     sendMessage(messageInput.value);
+                    hasUserInteracted = true; // Set flag on keypress
                 }
             });
 
             // Event listener for the new PWA button
             pwaButton.addEventListener('click', () => {
                 window.open('https://tiffyai.github.io/App/', '_blank');
+                hasUserInteracted = true; // Set flag on button click
             });
             
             // Modal event listeners
@@ -334,6 +342,7 @@
             saveNameButton.addEventListener('click', () => {
                 if (nameInput.value.trim() !== '') {
                     saveUserName(nameInput.value.trim());
+                    hasUserInteracted = true; // Set flag on button click
                 } else {
                     console.error('Please enter a name.');
                 }
