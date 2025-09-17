@@ -125,16 +125,16 @@
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, serverTimestamp, onSnapshot, query, orderBy, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // IMPORTANT: Replace this with your own Firebase project configuration.
-        // You can find this in your Firebase console under Project Settings > Your apps.
+        // IMPORTANT: Paste your full, un-redacted Firebase project configuration here.
+        // It's the only way for the app to connect to your database.
         const firebaseConfig = {
-            apiKey: "AIzaSyD7ajxFTiETsJMg3nXC2i3-xMid70DEhjI",
-            authDomain: "tiffyai.firebaseapp.com",
-            projectId: "tiffyai",
-            storageBucket: "tiffyai.firebasestorage.app",
-            messagingSenderId: "1047156912441",
-            appId: "1:1047156912441:web:4e0979c965a5b4e63578e8",
-            measurementId: "G-TYC2YVJ49W"
+          apiKey: "AIzaSyD7ajxFTiETsJMg3nXC2i3-xMid70DEhjI",
+          authDomain: "tiffyai.firebaseapp.com",
+          projectId: "tiffyai",
+          storageBucket: "tiffyai.firebasestorage.app",
+          messagingSenderId: "1047156912441",
+          appId: "1:1047156912441:web:4e0979c965a5b4e63578e8",
+          measurementId: "G-TYC2YVJ49W"
         };
         
         // Use the local configuration if the global one isn't available (i.e., when run in a local browser)
